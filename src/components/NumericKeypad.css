@@ -1,0 +1,68 @@
+/* src/components/NumericKeypad.css */
+.numeric-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 1rem;
+}
+
+.key-row {
+  display: flex;
+  gap: 5px;
+}
+
+.key {
+  width: 100%;
+  height: 60px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background-color: #f0f0f0;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.key:hover {
+  background-color: #e0e0e0;
+  transform: scale(1.05);
+}
+
+.key:active {
+  transform: scale(0.95);
+}
+
+.key.backspace {
+  background-color: #ffcccb;
+  color: #d9534f;
+}
+
+.key.backspace:hover {
+  background-color: #ff9999;
+}
+
+.key.confirm {
+  background-color: #d4edda;
+  color: #28a745;
+}
+
+.key.confirm:hover {
+  background-color: #c3e6cb;
+}
+
+.key.icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* Estilos para pantallas pequeñas */
+@media (max-width: 480px) {
+  .key {
+    height: 50px;
+    font-size: 1.2rem;
+  }
+}

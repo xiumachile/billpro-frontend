@@ -1,0 +1,44 @@
+.ticket-container {
+    background: white;
+    width: 350px; /* Ancho típico de ticket */
+    margin: 20px auto;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    font-family: 'Courier New', Courier, monospace; /* Fuente monoespaciada tipo ticket */
+    color: black;
+}
+
+.text-center { text-align: center; }
+.divider { margin: 10px 0; overflow: hidden; white-space: nowrap; }
+.row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+.bold { font-weight: bold; }
+.large { font-size: 1.2rem; }
+.small { font-size: 0.8rem; }
+
+.ticket-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.btn-print { background: #3498db; color: white; padding: 5px 10px; border: none; cursor: pointer; }
+.btn-close { background: #e74c3c; color: white; padding: 5px 10px; border: none; cursor: pointer; }
+
+/* ESTILOS PARA IMPRESIÓN REAL */
+@media print {
+    body * { visibility: hidden; }
+    .no-print { display: none; }
+    #printable-area, #printable-area * {
+        visibility: visible;
+    }
+    #printable-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+    }
+    .modal-overlay { background: white; position: static; }
+}
