@@ -1,0 +1,40 @@
+/* src/components/reportes/ReportesVentas.css */
+
+@media print {
+    /* 1. Ocultar todo por defecto para limpiar la hoja */
+    body * {
+        visibility: hidden;
+    }
+
+    /* 2. Ocultar elementos de UI que no sirven en papel */
+    .no-print, .no-print * {
+        display: none !important;
+    }
+
+    /* 3. Hacer visible el CONTENEDOR PRINCIPAL del reporte */
+    #dashboard-printable, #dashboard-printable * {
+        visibility: visible;
+    }
+
+    /* 4. Posicionar el reporte al inicio de la hoja */
+    #dashboard-printable {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px; /* Un poco de margen */
+        background: white;
+    }
+
+    /* Ajustes para gráficos y tarjetas */
+    .bg-slate-50 {
+        background-color: white !important; /* Ahorrar tinta de fondo */
+    }
+    
+    /* Forzar impresión de colores de fondo (para las barras y tarjetas) */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}

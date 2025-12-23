@@ -1,5 +1,4 @@
-// src/services/cajaService.js
-import axios from '@/api/axiosInstance';
+import axios from '../api/axiosInstance'; // Ajusta la ruta según tu estructura (ej: ../api/axiosInstance)
 
 const cajaService = {
     // 1. Obtener lista de cajas físicas (Para configuración y apertura)
@@ -44,18 +43,19 @@ const cajaService = {
         return response.data;
     },
 
-    // 8. Historial y Reportes
+    // 8. Historial
     getHistorialCierres: async () => {
         const response = await axios.get('/caja/historial');
         return response.data;
     },
 
-    getReporteCierre: async (id) => {
+    // ✅ RENOMBRADO para coincidir con ReporteCajaTicket.jsx
+    getReporteCaja: async (id) => {
         const response = await axios.get(`/caja/reporte/${id}`);
         return response.data;
     },
 
-    // 9. Propinas (Esencial para el Modal de Propinas)
+    // 9. Propinas
     getPropinasAcumuladas: async () => {
         const response = await axios.get('/caja/propinas');
         return response.data;

@@ -1,47 +1,65 @@
-use tauri::Manager;
-use printers::{get_printers, print};
-use std::io::Write;
-use std::net::TcpStream;
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+use printers::{get_printers, get_printer_by_name};
+use printers::common::base::job::PrinterJobOptions; 
+use base64::{Engine as _, engine::general_purpose};
 
-// OPCIÓN A: USB / DRIVER SISTEMA
 #[tauri::command]
-fn imprimir_ticket_sistema(impresora_nombre: String, contenido_base64: String) -> Result<String, String> {
-    let bytes = base64::decode(&contenido_base64).map_err(|e| e.to_string())?;
-    match print(&impresora_nombre, &bytes) {
-        Ok(_) => Ok("Impreso por Sistema".to_string()),
-        Err(e) => Err(format!("Error sistema: {}", e)),
-    }
+fn obtener_impresoras() -> Vec<String> {
+    get_printers()
+        .into_iter()
+        .map(|p| p.name.clone())
+        .collect()
 }
 
-// OPCIÓN B: RED / IP DIRECTA
 #[tauri::command]
-fn imprimir_ticket_red(ip: String, puerto: String, contenido_base64: String) -> Result<String, String> {
-    let bytes = base64::decode(&contenido_base64).map_err(|e| e.to_string())?;
-    let address = format!("{}:{}", ip, puerto);
+fn imprimir_ticket(impresora: String, contenido_base64: String) -> Result<String, String> {
+    let bytes = general_purpose::STANDARD
+        .decode(&contenido_base64)
+        .map_err(|e| format!("Error decodificando Base64: {}", e))?;
+
+    let printer = get_printer_by_name(&impresora)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", impresora))?;
+
+    // ✅ CORRECCIÓN: name es Option<&str> y raw_properties es &[(&str, &str)]
+    let options = PrinterJobOptions { 
+        name: Some("Ticket Venta"),
+        raw_properties: &[]  // slice vacío
+    };
     
-    // Conexión con timeout simple (Rust nativo bloquea, idealmente usar async o timeout)
-    match TcpStream::connect(&address) {
-        Ok(mut stream) => {
-            if let Err(e) = stream.write_all(&bytes) {
-                return Err(format!("Error enviando datos a {}: {}", address, e));
-            }
-            Ok("Impreso por Red".to_string())
-        },
-        Err(e) => Err(format!("No se pudo conectar a {}: {}", address, e))
-    }
+    printer.print(&bytes, options)
+        .map_err(|e| format!("Error al imprimir: {}", e))?;
+
+    Ok("Impreso correctamente".to_string())
 }
 
 #[tauri::command]
-fn listar_impresoras_sistema() -> Vec<String> {
-    get_printers().into_iter().map(|p| p.name).collect()
+fn abrir_cajon(impresora: String) -> Result<String, String> {
+    let codigo_apertura = vec![27, 112, 0, 25, 250]; 
+    
+    let printer = get_printer_by_name(&impresora)
+        .ok_or_else(|| format!("Impresora '{}' no encontrada", impresora))?;
+
+    // ✅ CORRECCIÓN: Lo mismo aquí
+    let options = PrinterJobOptions { 
+        name: Some("Abrir Cajon"),
+        raw_properties: &[]  // slice vacío
+    };
+    
+    printer.print(&codigo_apertura, options)
+        .map_err(|e| format!("Error abriendo cajón: {}", e))?;
+
+    Ok("Cajón abierto".to_string())
 }
 
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            listar_impresoras_sistema,
-            imprimir_ticket_sistema, // ✅ Registrada
-            imprimir_ticket_red      // ✅ Registrada
+            obtener_impresoras, 
+            imprimir_ticket,
+            abrir_cajon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

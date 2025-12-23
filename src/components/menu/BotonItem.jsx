@@ -131,7 +131,7 @@ export default function BotonItem({
             fontFamily: 'Arial, sans-serif' 
           }}
         >
-          {isActive ? (data?.etiqueta || 'Sin Nombre') : ''}
+          {isActive ? (data?.etiqueta || '') : ''}
         </span>
 
         {/* --- HERRAMIENTAS DE EDICIÓN FLOTANTES (Solo en Modo Edición y si Activo) --- */}

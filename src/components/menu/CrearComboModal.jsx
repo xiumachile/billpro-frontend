@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Save, Calculator, Printer } from 'lucide-react';
+import { X, Plus, Save, Calculator, Printer, DollarSign, Star } from 'lucide-react';
 import { menuApi } from '../../api/menuApi'; // ✅ Importar API
 
 export default function CrearComboModal({
@@ -7,18 +7,23 @@ export default function CrearComboModal({
   onClose,
   onSave,
   comboEdicion = null,
-  productos = []
+  productos = [],
+  tipoPrecioCartaId = 1 // ✅ Recibir ID de precio de la carta actual
 }) {
   const isEditing = Boolean(comboEdicion);
 
   // Estados principales
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [precio, setPrecio] = useState('');
   
+  // ✅ ESTADOS DE PRECIOS
+  const [tiposPrecio, setTiposPrecio] = useState([]); 
+  const [listaPrecios, setListaPrecios] = useState({}); 
+  const [precio, setPrecio] = useState(''); // Precio visual principal
+
   // ✅ ESTADO PARA ZONA DE IMPRESIÓN
   const [zonaImpresion, setZonaImpresion] = useState('');
-  const [impresoras, setImpresoras] = useState([]); // Lista cargada de la BD
+  const [impresoras, setImpresoras] = useState([]);
 
   const [opcionImpresion, setOpcionImpresion] = useState('nombre');
   const [activo, setActivo] = useState(true);
@@ -28,35 +33,72 @@ export default function CrearComboModal({
   const [productoSeleccionado, setProductoSeleccionado] = useState('');
   const [cantidadProducto, setCantidadProducto] = useState(1);
 
-  // ✅ CARGAR IMPRESORAS AL ABRIR
+  const [cargandoDatos, setCargandoDatos] = useState(false);
+
+  // ✅ CARGAR DATOS INICIALES (Impresoras y Precios)
   useEffect(() => {
     if (isOpen) {
-      cargarImpresoras();
+      cargarDatosAuxiliares();
     }
   }, [isOpen]);
 
-  const cargarImpresoras = async () => {
+  const cargarDatosAuxiliares = async () => {
+    setCargandoDatos(true);
     try {
-      const res = await menuApi.getImpresoras();
-      const data = Array.isArray(res) ? res : (res.data || []);
-      // Filtramos solo las activas
-      setImpresoras(data.filter(i => i.estado === 'Activa'));
+      const [impresorasRes, preciosRes] = await Promise.allSettled([
+          menuApi.getImpresoras(),
+          menuApi.getTiposPrecios()
+      ]);
+
+      if (impresorasRes.status === 'fulfilled') {
+          const data = Array.isArray(impresorasRes.value) ? impresorasRes.value : (impresorasRes.value?.data || []);
+          setImpresoras(data.filter(i => i.estado === 'Activa'));
+      }
+
+      if (preciosRes.status === 'fulfilled') {
+          const data = Array.isArray(preciosRes.value) ? preciosRes.value : (preciosRes.value?.data || []);
+          setTiposPrecio(data);
+          
+          if (!isEditing) {
+              const inicial = {};
+              data.forEach(t => inicial[t.id] = '');
+              setListaPrecios(inicial);
+          }
+      }
     } catch (error) {
-      console.error("Error cargando impresoras", error);
+      console.error("Error cargando datos auxiliares", error);
+    } finally {
+      setCargandoDatos(false);
     }
   };
 
-  // Cargar datos de edición
+  // CARGAR EDICIÓN
   useEffect(() => {
     if (isOpen && isEditing && comboEdicion) {
       setNombre(comboEdicion.nombre || '');
       setDescripcion(comboEdicion.descripcion || '');
-      setPrecio(String(comboEdicion.precio || ''));
-      setZonaImpresion(comboEdicion.zona_impresion || ''); // ✅ Cargar zona guardada
+      setZonaImpresion(comboEdicion.zona_impresion || ''); 
       setOpcionImpresion(comboEdicion.opcion_impresion || 'nombre');
       setActivo(comboEdicion.activo !== false);
 
-      // Cargar productos del combo si existen
+      // ✅ CARGAR PRECIOS
+      const preciosMap = {};
+      preciosMap[1] = comboEdicion.precio; // Precio base siempre ID 1
+      
+      // Asumimos que el backend envía 'precios' si es que implementaste la relación en Combo.php
+      // Si no, solo cargará el precio base, lo cual es seguro.
+      if (comboEdicion.precios && Array.isArray(comboEdicion.precios)) {
+          comboEdicion.precios.forEach(p => {
+              preciosMap[p.tipo_precio_id] = p.precio;
+          });
+      }
+      setListaPrecios(preciosMap);
+
+      // Sincronizar precio visual con la carta actual
+      const precioCartaActual = preciosMap[tipoPrecioCartaId] || comboEdicion.precio;
+      setPrecio(String(precioCartaActual));
+
+      // Cargar productos del combo
       if (comboEdicion.items && Array.isArray(comboEdicion.items)) {
         setProductosCombo(comboEdicion.items.map(item => ({
           id: item.id,
@@ -73,18 +115,20 @@ export default function CrearComboModal({
         })));
       }
     } else if (isOpen && !isEditing) {
-      // Reset para nuevo combo
-      setNombre('');
-      setDescripcion('');
-      setPrecio('');
-      setZonaImpresion('');
-      setOpcionImpresion('nombre');
-      setActivo(true);
-      setProductosCombo([]);
-      setProductoSeleccionado('');
-      setCantidadProducto(1);
+      // Reset
+      setNombre(''); setDescripcion(''); setPrecio('');
+      setZonaImpresion(''); setOpcionImpresion('nombre');
+      setActivo(true); setProductosCombo([]); setProductoSeleccionado(''); setCantidadProducto(1);
+      setListaPrecios({});
     }
-  }, [isOpen, isEditing, comboEdicion]);
+  }, [isOpen, isEditing, comboEdicion, tipoPrecioCartaId]);
+
+  // ✅ MANEJADOR DE PRECIOS
+  const handlePrecioChange = (idTipo, valor) => {
+      setListaPrecios(prev => ({ ...prev, [idTipo]: valor }));
+      if (Number(idTipo) === Number(tipoPrecioCartaId)) setPrecio(valor);
+      if (Number(idTipo) === 1 && !tipoPrecioCartaId) setPrecio(valor);
+  };
 
   const handleAgregarProducto = () => {
     if (!productoSeleccionado) { return alert('⚠️ Selecciona un producto.'); }
@@ -121,16 +165,30 @@ export default function CrearComboModal({
   const handleGuardar = async () => {
     if (!nombre.trim()) return alert('⚠️ El nombre del combo es obligatorio.');
     
-    const precioTotal = parseFloat(precio);
-    if (isNaN(precioTotal) || precioTotal <= 0) return alert('⚠️ Ingresa un precio válido mayor a 0.');
+    // Validar precio base o actual
+    const precioBase = parseFloat(listaPrecios[1]);
+    const precioActual = parseFloat(precio);
+    
+    if ((isNaN(precioBase) || precioBase < 0) && (isNaN(precioActual) || precioActual < 0)) {
+        return alert('⚠️ Ingresa un precio válido (Base o Carta Actual).');
+    }
 
     if (productosCombo.length === 0) return alert('⚠️ Agrega al menos un producto al combo.');
 
     const datosAGuardar = {
       nombre: nombre.trim(),
       descripcion: descripcion.trim() || null,
-      precio: precioTotal,
-      zona_impresion: zonaImpresion || null, // ✅ Guardar impresora seleccionada
+      
+      // ✅ Precio base para compatibilidad
+      precio: precioBase || precioActual || 0,
+
+      // ✅ Lista de precios para backend
+      precios_lista: Object.entries(listaPrecios).map(([id, val]) => ({
+          tipo_precio_id: parseInt(id),
+          precio: parseFloat(val || 0)
+      })),
+
+      zona_impresion: zonaImpresion || null,
       opcion_impresion: opcionImpresion,
       activo: activo,
       items: productosCombo
@@ -171,23 +229,38 @@ export default function CrearComboModal({
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
               <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500" rows="2" placeholder="Descripción del combo..."/>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Precio *</label>
-              <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-bold" placeholder="0.00"/>
-              {productosCombo.length > 0 && <p className="text-xs text-gray-500 mt-1">Suma productos: ${calcularPrecioTotal().toFixed(2)}</p>}
+            
+            {/* ✅ SECCIÓN PRECIOS MÚLTIPLES */}
+            <div className="md:col-span-2 bg-purple-50 p-4 rounded-xl border border-purple-200">
+                <label className="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                    <DollarSign size={16} className="text-green-600"/> Precios de Venta
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {tiposPrecio.map(tp => {
+                        const esPrecioActivo = Number(tp.id) === Number(tipoPrecioCartaId);
+                        return (
+                            <div key={tp.id} className={`relative ${esPrecioActivo ? 'order-first sm:order-none' : ''}`}>
+                                <label className={`text-xs font-bold uppercase mb-1 block ${esPrecioActivo ? 'text-purple-700' : 'text-gray-500'}`}>{tp.nombre}</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                                    <input type="number" className={`w-full pl-6 pr-3 py-2 border rounded-lg outline-none transition-all ${esPrecioActivo ? 'border-purple-500 ring-2 ring-purple-100 bg-white font-bold text-gray-900' : 'border-gray-300 bg-white text-gray-600 focus:border-purple-400'}`} placeholder="0" value={listaPrecios[tp.id] || ''} onChange={e => handlePrecioChange(tp.id, e.target.value)}/>
+                                    {esPrecioActivo && (<div className="absolute -top-8 right-0 bg-purple-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1"><Star size={10} fill="white"/> Carta Actual</div>)}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                {productosCombo.length > 0 && <p className="text-xs text-gray-500 mt-3 text-right">Suma de productos base: ${calcularPrecioTotal().toLocaleString()}</p>}
             </div>
 
-            {/* ✅ SELECTOR DE ZONA DE IMPRESIÓN */}
+            {/* SELECTOR ZONA IMPRESIÓN */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
                   <Printer size={14}/> Zona de Impresión
               </label>
               <select value={zonaImpresion} onChange={(e) => setZonaImpresion(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white">
                 <option value="">-- Sin Impresión --</option>
-                {/* Opciones por defecto */}
-                <option value="cocina">Cocina (Default)</option>
-                <option value="barra">Barra</option>
-                {/* Opciones dinámicas de la BD */}
+                {impresoras.length === 0 && <option value="Cocina">Cocina (Default)</option>}
                 {impresoras.map(imp => (
                     <option key={imp.id} value={imp.nombre}>{imp.nombre} ({imp.tipo_impresora})</option>
                 ))}
@@ -252,7 +325,7 @@ export default function CrearComboModal({
 
         <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-2xl border-t">
           <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 font-medium rounded-lg hover:bg-gray-200">Cancelar</button>
-          <button type="button" onClick={handleGuardar} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg flex items-center"><Save className="w-4 h-4 mr-2"/> <span>{isEditing ? 'Actualizar' : 'Crear'} Combo</span></button>
+          <button type="button" onClick={handleGuardar} disabled={cargandoDatos} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg flex items-center"><Save className="w-4 h-4 mr-2"/> <span>{isEditing ? 'Actualizar' : 'Crear'} Combo</span></button>
         </div>
       </div>
     </div>

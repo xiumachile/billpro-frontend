@@ -59,7 +59,11 @@ export const menuApi = {
     // === PRODUCTOS ===
     getCategorias: () => handleResponse(axios.get('/productos/categorias')),
     getProductos: () => handleResponse(axios.get('/productos')),
-    getProductosCarta: () => handleResponse(axios.get('/productos')), // Alias
+    getProductosCarta: () => handleResponse(axios.get('/productos')), // Alias para administración
+    
+    // ✅ NUEVO: Obtener productos con precio dinámico según la carta (Para el POS)
+    getProductosPorCarta: (cartaId) => handleResponse(axios.get('/productos/por-carta', { params: { carta_id: cartaId } })),
+
     getTodosProductosParaRecetas: () => handleResponse(axios.get('/inventario/todos-para-recetas')),
 
     crearProductoCarta: (datos) => handleResponse(axios.post('/productos', datos)),
@@ -77,6 +81,7 @@ export const menuApi = {
 
     // === COMBOS ===
     getCombos: () => handleResponse(axios.get('/combos')),
+    getCombosPorCarta: (cartaId) => handleResponse(axios.get('/combos/por-carta', { params: { carta_id: cartaId } })),
     getComboItems: () => Promise.resolve([]),
     crearCombo: (datos) => handleResponse(axios.post('/combos', datos)),
     actualizarCombo: (id, datos) => handleResponse(axios.put(`/combos/${id}`, datos)),
@@ -107,6 +112,11 @@ export const menuApi = {
     updateAppDelivery: (id, d) => handleResponse(axios.put(`/apps-delivery/${id}`, d)),
     deleteAppDelivery: (id) => handleResponse(axios.delete(`/apps-delivery/${id}`)),
 
+    // === TIPOS DE PRECIOS ===
+    getTiposPrecios: () => handleResponse(axios.get('/tipos-precios')),
+    crearTipoPrecio: (datos) => handleResponse(axios.post('/tipos-precios', datos)),
+    eliminarTipoPrecio: (id) => handleResponse(axios.delete(`/tipos-precios/${id}`)),
+ 
     // === CLIENTES Y USUARIOS ===
     getClientes: (params) => handleResponse(axios.get('/clientes', { params })),
     crearCliente: (datos) => handleResponse(axios.post('/clientes', datos)),

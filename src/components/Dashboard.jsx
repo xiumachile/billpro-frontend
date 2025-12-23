@@ -7,14 +7,12 @@ import {
 
 // IMPORTACIONES DE CONTEXTO Y MODALES
 import { useCaja } from '../context/CajaContext';
-import { useLanguage } from '../context/LanguageContext';
 import AperturaCajaModal from './caja/AperturaCajaModal';
 import CierreCajaModal from './caja/CierreCajaModal';
 import MovimientoCajaModal from './caja/MovimientoCajaModal';
 
 export default function Dashboard({ onLogout, usuario: usuarioProp }) {
   const navigate = useNavigate();
-  const { t } = useLanguage();
   
   // --- ESTADOS DATOS ---
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -90,31 +88,31 @@ export default function Dashboard({ onLogout, usuario: usuarioProp }) {
   const nombreCajeroGlobal = hayCajaGlobal ? (sesionesGlobales[0].usuario || 'Otro') : '';
   const mostrarAlertaApertura = !loadingCaja && !cajaAbierta && !hayCajaGlobal && puedeGestionarCaja();
 
-  // --- CONFIGURACIÓN DE BOTONES ---
+  // --- CONFIGURACIÓN DE BOTONES (Sin Traducción) ---
   const todosLosBotones = [
-    { name: t('menu_salir') || 'Salir', icon: '🚪', action: onLogout, roles: ['todos'] },
-    { name: t('menu_reimprimir_cuenta') || 'Reimprimir', icon: '🧾', action: () => goToModule('reimprimir'), roles: ['dueño', 'admin', 'administrador', 'cajero'] },
-    { name: t('menu_reportes_ventas') || 'Reportes', icon: '📈', action: () => goToModule('reportes'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Salir', icon: '🚪', action: onLogout, roles: ['todos'] },
+    { name: 'Reimprimir', icon: '🧾', action: () => goToModule('reimprimir'), roles: ['dueño', 'admin', 'administrador', 'cajero'] },
+    { name: 'Reportes', icon: '📈', action: () => goToModule('reportes'), roles: ['dueño', 'admin', 'administrador'] },
     
     // Finanzas
-    { name: t('menu_gastos_op') || 'Gastos', icon: <Wallet className="w-10 h-10 text-gray-600"/>, action: () => goToModule('gastos'), roles: ['dueño', 'admin', 'administrador'] },
-    { name: t('menu_balance') || 'Balance', icon: <PieChart className="w-10 h-10 text-gray-600"/>, action: () => goToModule('balance'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Gastos', icon: <Wallet className="w-10 h-10 text-gray-600"/>, action: () => goToModule('gastos'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Balance', icon: <PieChart className="w-10 h-10 text-gray-600"/>, action: () => goToModule('balance'), roles: ['dueño', 'admin', 'administrador'] },
 
     // Gestión
-    { name: t('menu_gestion_carta') || 'Carta', icon: '📖', action: () => goToModule('carta'), roles: ['dueño', 'admin', 'administrador'] },
-    { name: t('menu_inventario') || 'Inventario', icon: '📦', action: () => goToModule('inventario'), roles: ['dueño', 'admin', 'administrador'] },
-    { name: t('menu_clientes') || 'Clientes', icon: '👥', action: () => goToModule('clientes'), roles: ['dueño', 'admin', 'administrador', 'cajero', 'mozo'] },
-    { name: t('menu_parametros') || 'Ajustes', icon: '⚙️', action: () => goToModule('parametros'), roles: ['dueño', 'admin', 'administrador'] },
-    { name: t('menu_gestion_usuario') || 'Usuarios', icon: '👤', action: () => goToModule('usuarios'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Carta', icon: '📖', action: () => goToModule('carta'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Inventario', icon: '📦', action: () => goToModule('inventario'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Clientes', icon: '👥', action: () => goToModule('clientes'), roles: ['dueño', 'admin', 'administrador', 'cajero', 'mozo'] },
+    { name: 'Ajustes', icon: '⚙️', action: () => goToModule('parametros'), roles: ['dueño', 'admin', 'administrador'] },
+    { name: 'Usuarios', icon: '👤', action: () => goToModule('usuarios'), roles: ['dueño', 'admin', 'administrador'] },
     
     // Operación
-    { name: t('menu_delivery') || 'Delivery', icon: '🛵', action: () => goToModule('delivery'), roles: ['todos'] },
-    { name: t('menu_para_llevar') || 'Take Out', icon: '🥡', action: () => goToModule('paralleva'), roles: ['todos'] },
+    { name: 'Delivery', icon: '🛵', action: () => goToModule('delivery'), roles: ['todos'] },
+    { name: 'Para Llevar', icon: '🥡', action: () => goToModule('paralleva'), roles: ['todos'] },
     
     // ✅ 2. BOTÓN PEDIDO APP
     { name: 'Pedido APP', icon: <Smartphone className="w-10 h-10 text-gray-600"/>, action: () => goToModule('app_pedidos'), roles: ['todos'] },
 
-    { name: t('menu_gestion_mesas') || 'Mesas', icon: '🍽️', action: () => goToModule('mesas'), roles: ['todos'] },
+    { name: 'Mesas', icon: '🍽️', action: () => goToModule('mesas'), roles: ['todos'] },
   ];
 
   const menuButtons = todosLosBotones.filter(boton => {
@@ -137,10 +135,10 @@ export default function Dashboard({ onLogout, usuario: usuarioProp }) {
         {/* Usuario */}
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
-            {t('dashboard_user', { nombre: usuario?.nombre_completo || 'User' })}
+            Usuario: {usuario?.nombre_completo || 'Desconocido'}
           </span>
           <span style={{ fontSize: '14px', padding: '4px 12px', backgroundColor: '#e3f2fd', borderRadius: '12px', color: '#1976d2', fontWeight: '500' }}>
-            {t('dashboard_role', { rol: usuario?.roles?.[0]?.nombre || 'Sin rol' })}
+            {usuario?.roles?.[0]?.nombre || 'Sin rol'}
           </span>
         </div>
 
@@ -154,31 +152,31 @@ export default function Dashboard({ onLogout, usuario: usuarioProp }) {
           }}>
              <span style={{ color: cajaAbierta ? '#2e7d32' : (hayCajaGlobal ? '#1565c0' : '#c62828'), fontWeight: 'bold', marginRight: '5px' }}>
                 {cajaAbierta 
-                    ? t('caja_mi_abierta') 
-                    : (hayCajaGlobal ? t('caja_abierta_otro', { nombreCajero: nombreCajeroGlobal }) : t('caja_cerrada'))
+                    ? 'MI CAJA ABIERTA' 
+                    : (hayCajaGlobal ? `CAJA ABIERTA POR ${nombreCajeroGlobal}` : 'CAJA CERRADA')
                 }
              </span>
 
              {cajaAbierta && puedeGestionarCaja() && (
                  <>
                     <button onClick={() => setShowMovimientoModal(true)} style={{ padding: '5px 10px', fontSize: '11px', backgroundColor: '#f57f17', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                         {t('caja_btn_movimiento')}
+                         MOVIMIENTO
                      </button>
                      <button onClick={() => setShowCierreModal(true)} style={{ padding: '5px 10px', fontSize: '11px', backgroundColor: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                         {t('caja_btn_cerrar_turno')}
+                         CERRAR TURNO
                      </button>
                  </>
              )}
 
              {!cajaAbierta && hayCajaGlobal && puedeGestionarCaja() && (
                 <button onClick={() => setShowAperturaModal(true)} style={{ padding: '4px 8px', fontSize: '10px', backgroundColor: '#fff', border: '1px solid #2196f3', color: '#2196f3', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                    {t('caja_btn_abrir_otra')}
+                    ABRIR OTRA
                 </button>
              )}
           </div>
 
-          <span>{t('dashboard_pos_id')}</span>
-          <span>{t('dashboard_current_time', { hora: currentTime.toLocaleTimeString('es-CL') })}</span>
+          <span>POS #01</span>
+          <span>Hora: {currentTime.toLocaleTimeString('es-CL')}</span>
         </div>
       </div>
 
@@ -192,15 +190,15 @@ export default function Dashboard({ onLogout, usuario: usuarioProp }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '24px' }}>⚠️</span>
             <div>
-              <h3 style={{ margin: 0, color: '#856404', fontSize: '16px' }}>{t('alert_local_cerrado_title')}</h3>
-              <p style={{ margin: 0, color: '#856404', fontSize: '13px' }}>{t('alert_local_cerrado_message')}</p>
+              <h3 style={{ margin: 0, color: '#856404', fontSize: '16px' }}>¡LOCAL CERRADO!</h3>
+              <p style={{ margin: 0, color: '#856404', fontSize: '13px' }}>No hay ninguna caja abierta. Debes abrir caja para comenzar a vender.</p>
             </div>
           </div>
           <button 
             onClick={() => setShowAperturaModal(true)}
             style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
           >
-            {t('caja_btn_abrir_ahora')}
+            ABRIR CAJA AHORA
           </button>
         </div>
       )}
@@ -234,17 +232,17 @@ export default function Dashboard({ onLogout, usuario: usuarioProp }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1, textAlign: 'center', padding: '20px' }}>
         <div style={{ backgroundColor: 'white', padding: '30px 40px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '600px' }}>
           <h1 style={{ color: '#d32f2f', fontSize: '72px', fontWeight: 'bold', margin: '0', letterSpacing: '2px' }}>
-            {t('dashboard_logo')}
+            RESTOBAR
           </h1>
           <p style={{ fontSize: '24px', color: '#666', margin: '10px 0 0 0', fontWeight: '300' }}>
-            {t('dashboard_title')}
+            Punto de Venta
           </p>
         </div>
       </div>
 
       {/* FOOTER */}
       <div style={{ backgroundColor: '#ffffff', padding: '12px', textAlign: 'center', fontSize: '13px', color: '#999', borderTop: '1px solid #e0e0e0', borderRadius: '8px' }}>
-        {t('footer_copyright')}
+        © 2025 Sistema POS. Todos los derechos reservados.
       </div>
 
       {/* MODALES */}

@@ -11,7 +11,8 @@ import ConfiguracionRed from './ConfiguracionRed';
 import FormasPagoManager from './FormasPagoManager';
 import UnidadesMedidaManager from './UnidadesMedidaManager';
 import ConfiguracionVarios from './ConfiguracionVarios';
-import ConfiguracionApps from './ConfiguracionApps'; // ✅ AGREGADO
+import ConfiguracionApps from './ConfiguracionApps'; 
+import ConfiguracionPrecios from './ConfiguracionPrecios'; // ✅ Importar el nuevo componente
 
 import {
   ArrowLeft,
@@ -26,7 +27,8 @@ import {
   ChevronRight,
   Monitor,
   Settings,
-  Smartphone // ✅ AGREGADO (Faltaba este import)
+  Smartphone,
+  DollarSign // ✅ Nuevo icono para precios
 } from 'lucide-react';
 
 export default function Parametros({ usuario }) {
@@ -69,7 +71,7 @@ export default function Parametros({ usuario }) {
   useEffect(() => {
     const cargarCartaActiva = async () => {
       try {
-        setNombreCarta('CARTA ACTIVA');
+        setNombreCarta('CARTA ACTIVA'); // (Aquí podrías llamar a una API real)
       } catch (error) {
         console.error('Error al cargar carta activa:', error);
         setNombreCarta('CARTA NO ACTIVA');
@@ -88,11 +90,18 @@ export default function Parametros({ usuario }) {
       description: 'Gestiona los terminales y puntos de venta'
     },
     { 
+      id: 'precios', // ✅ NUEVA PESTAÑA
+      name: 'Listas de Precios', 
+      icon: DollarSign, 
+      component: ConfiguracionPrecios,
+      description: 'Configura listas (Local, Rappi, Uber, etc.)'
+    },
+    { 
       id: 'apps', 
       name: 'Apps Delivery', 
-      icon: Smartphone, // ✅ Ahora sí está definido
+      icon: Smartphone, 
       component: ConfiguracionApps,
-      description: 'Configura plataformas (Uber, Rappi, etc.)'
+      description: 'Configura plataformas externas'
     },
     { 
       id: 'impresoras', 

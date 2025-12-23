@@ -1,36 +1,40 @@
+/* src/components/caja/ReporteCajaTicket.css */
+
 .ticket-container {
     background: white;
     width: 350px; /* Ancho típico de ticket */
-    margin: 20px auto;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    font-family: 'Courier New', Courier, monospace; /* Fuente monoespaciada tipo ticket */
+    margin: 0 auto;
+    padding: 10px;
+    font-family: 'Courier New', Courier, monospace; /* Fuente monoespaciada */
     color: black;
+    font-size: 13px; /* Tamaño legible para térmica */
 }
 
 .text-center { text-align: center; }
-.divider { margin: 10px 0; overflow: hidden; white-space: nowrap; }
-.row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+.text-right { text-align: right; }
+.divider { margin: 8px 0; overflow: hidden; white-space: nowrap; }
+.row { display: flex; justify-content: space-between; margin-bottom: 4px; }
 .bold { font-weight: bold; }
 .large { font-size: 1.2rem; }
-.small { font-size: 0.8rem; }
-
-.ticket-actions {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.btn-print { background: #3498db; color: white; padding: 5px 10px; border: none; cursor: pointer; }
-.btn-close { background: #e74c3c; color: white; padding: 5px 10px; border: none; cursor: pointer; }
+.small { font-size: 0.85rem; }
+.uppercase { text-transform: uppercase; }
 
 /* ESTILOS PARA IMPRESIÓN REAL */
 @media print {
-    body * { visibility: hidden; }
-    .no-print { display: none; }
+    /* Ocultar todo lo que no sea el área de impresión */
+    body * {
+        visibility: hidden;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .no-print { display: none !important; }
+
+    /* Hacer visible solo el ticket */
     #printable-area, #printable-area * {
         visibility: visible;
     }
+
     #printable-area {
         position: absolute;
         left: 0;
@@ -40,5 +44,10 @@
         padding: 0;
         box-shadow: none;
     }
-    .modal-overlay { background: white; position: static; }
+    
+    /* Evitar fondos oscuros del modal al imprimir */
+    .modal-overlay { 
+        background: white !important; 
+        position: static !important;
+    }
 }

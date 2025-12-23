@@ -8,7 +8,7 @@ import ModalPreCuenta from './pedido/ModalPreCuenta';
 import { useLanguage } from '../context/LanguageContext';
 import { 
   ArrowLeft, LogOut, Eraser, X, Utensils, Clock, DollarSign, Printer, Eye, FileText,
-  Home, Users 
+  Home, Users, Lock 
 } from 'lucide-react';
 
 export default function GestionMesas({ onLogout, usuario }) {
@@ -34,7 +34,11 @@ export default function GestionMesas({ onLogout, usuario }) {
   // --- INFO USUARIO ---
   const nombreUsuario = usuario?.nombre_completo?.split(' ')[0] || 'Usuario';
   const rolUsuario = usuario?.roles?.[0]?.nombre || 'Sin Rol';
-  const esAdmin = usuario?.roles?.some(r => ['admin', 'dueño'].includes((r.name || r.nombre).toLowerCase()));
+  
+  // Lógica de roles
+  const esAdmin = usuario?.roles?.some(r => ['admin', 'dueño', 'administrador'].includes((r.name || r.nombre).toLowerCase()));
+  const esCajero = usuario?.roles?.some(r => ['cajero'].includes((r.name || r.nombre).toLowerCase()));
+  const esMozo = !esAdmin && !esCajero; 
 
   // --- MODALES ---
   const [showTomarPedido, setShowTomarPedido] = useState(false);
@@ -102,29 +106,144 @@ export default function GestionMesas({ onLogout, usuario }) {
       return { texto: `${minutos}/${limiteMinutos}'`, color: 'text-green-700 font-medium', alerta: false, bg: 'bg-green-50' };
   };
 
-  const handleProcesarMesa = async (numeroInput) => {
-    if (!numeroInput) return alert('Ingrese un número de mesa');
-    const numStr = String(numeroInput).trim();
-    setCargandoPedido(true);
-    try {
-        const pedidoEnMemoria = pedidosActivos.find(p => String(p.mesa?.numero) === numStr);
-        if (pedidoEnMemoria) {
-            const pedidoFullRes = await menuApi.getPedidoById(pedidoEnMemoria.id);
-            const pedidoFull = pedidoFullRes.data || pedidoFullRes;
-            setMesaSeleccionadaObj(pedidoFull.mesa || pedidoEnMemoria.mesa);
+ // ... resto del código existente ...
+
+/**
+ * ✅ FUNCIÓN CORREGIDA: VALIDACIÓN TEMPRANA DE MESA
+ * Ahora maneja correctamente la edición de pedidos existentes
+ * sin bloquear al mozo cuando quiere editar SU propio pedido
+ */
+const handleProcesarMesa = async (numeroInput) => {
+  if (!numeroInput) return alert('Ingrese un número de mesa');
+  const numStr = String(numeroInput).trim();
+  setCargandoPedido(true);
+  
+  try {
+    // Buscar si hay un pedido existente para esta mesa ANTES de validar
+    const pedidoEnMemoria = pedidosActivos.find(p => 
+      String(p.mesa?.numero) === numStr
+    );
+    
+    /**
+     * ✅ CASO ESPECIAL: Si es un pedido existente del MISMO MOZO,
+     * cargar directamente sin pasar por la validación estricta
+     */
+    if (pedidoEnMemoria) {
+      const idMozoPedido = pedidoEnMemoria.id_mozo || pedidoEnMemoria.mozo?.id;
+      const esPropietario = Number(idMozoPedido) === Number(usuario.id);
+      
+      if (esPropietario) {
+        // ✅ Es el dueño del pedido - cargar directamente sin validaciones adicionales
+        const pedidoFullRes = await menuApi.getPedidoById(pedidoEnMemoria.id);
+        const pedidoFull = pedidoFullRes.data || pedidoFullRes;
+        
+        // Buscar la mesa completa en el estado
+        const mesaCompleta = todasLasMesasDB.find(m => 
+          String(m.numero) === numStr || String(m.id) === String(pedidoFull.mesa_id)
+        );
+        
+        setMesaSeleccionadaObj(mesaCompleta || pedidoFull.mesa);
+        setPedidoExistente(pedidoFull);
+        setShowTomarPedido(true);
+        setSelectedMesaNum('');
+        return; // ✅ Salir temprano - no se necesita más validación
+      }
+    }
+    
+    // 🔒 VALIDACION CENTRALIZADA con backend (MesaController@store)
+    // Solo para mesas nuevas o cuando no es el dueño del pedido existente
+    const resValidacion = await menuApi.crearMesa({ numero: numStr });
+    const mesaValidada = resValidacion.data || resValidacion;
+    
+    // Buscar nuevamente el pedido (podría haber cambiado)
+    const pedidoActualizado = pedidosActivos.find(p => 
+      String(p.mesa?.numero) === numStr || 
+      (mesaValidada.id && String(p.mesa_id) === String(mesaValidada.id))
+    );
+    
+    if (pedidoActualizado) {
+      // Cargar el pedido completo con todos sus detalles
+      const pedidoFullRes = await menuApi.getPedidoById(pedidoActualizado.id);
+      const pedidoFull = pedidoFullRes.data || pedidoFullRes;
+      
+      setMesaSeleccionadaObj(mesaValidada);
+      setPedidoExistente(pedidoFull);
+      setShowTomarPedido(true);
+    } else {
+      // Es una mesa nueva o libre - usar la información validada por el backend
+      setMesaSeleccionadaObj(mesaValidada);
+      setPedidoExistente(null);
+      setShowTomarPedido(true);
+    }
+    
+    setSelectedMesaNum('');
+  } catch (error) {
+    console.error("Error al validar mesa:", error);
+    const status = error.response?.status;
+    const data = error.response?.data;
+    
+    // 🔒 MANEJO DE ERRORES ESPECÍFICOS DEL BACKEND
+    if (status === 403 && data?.error_type === 'mesa_ocupada_otro_mozo') {
+    const nombreColega = data.pedido_existente?.mozo_nombre || 'otro compañero';
+    
+    // ✅ MENSAJE SIMPLIFICADO Y EN MAYÚSCULAS
+    alert(
+      `⛔ LA MESA ESTÁ SIENDO ATENDIDA POR ${nombreColega.toUpperCase()}.\n\n` +
+      `NO ES POSIBLE UTILIZAR ESTA MESA`
+    );
+  } 
+    else if (status === 409 && data?.error_type === 'pedido_duplicado') {
+      // ✅ CASO ESPECIAL: Si es el mismo mozo y quiere editar, permitir acceso directo
+      const idMozoExistente = data.pedido_existente?.id_mozo;
+      const esPropietario = Number(idMozoExistente) === Number(usuario.id);
+      
+      if (esPropietario) {
+        // Cargar directamente el pedido existente sin confirmación
+        menuApi.getPedidoById(data.pedido_existente.id)
+          .then(res => {
+            const pedidoFull = res.data || res;
+            const mesaPedido = todasLasMesasDB.find(m => String(m.numero) === numStr) || pedidoFull.mesa;
+            
+            setMesaSeleccionadaObj(mesaPedido);
             setPedidoExistente(pedidoFull);
             setShowTomarPedido(true);
-        } else {
-            const mesaReal = todasLasMesasDB.find(m => String(m.numero) === numStr);
-            setMesaSeleccionadaObj(mesaReal || { id: null, numero: numStr, nombre: `Mesa ${numStr}`, estado: 'libre' });
-            setPedidoExistente(null);
-            setShowTomarPedido(true);
+          })
+          .catch(e => {
+            console.error("Error al cargar pedido existente:", e);
+            alert("Error al cargar el pedido existente");
+          });
+      } else {
+        // Es otro mozo - mostrar confirmación como antes
+        if (window.confirm(`⚠️ YA TIENES UN PEDIDO ACTIVO\n\nLa Mesa ${numStr} ya tiene tu pedido #${data.pedido_existente?.id}.\n\n¿Deseas continuar con ese pedido?`)) {
+          menuApi.getPedidoById(data.pedido_existente.id)
+            .then(res => {
+              const pedidoFull = res.data || res;
+              setMesaSeleccionadaObj(pedidoFull.mesa);
+              setPedidoExistente(pedidoFull);
+              setShowTomarPedido(true);
+            })
+            .catch(e => {
+              console.error("Error al cargar pedido existente:", e);
+              alert("Error al cargar el pedido existente");
+            });
         }
-        setSelectedMesaNum('');
-    } catch (error) { console.error(error); alert("Error al cargar la mesa."); } finally { setCargandoPedido(false); }
-  };
+      }
+    }
+    else if (status === 404 && data?.error_type === 'mesa_no_existe') {
+      alert(`⛔ MESA NO ENCONTRADA\n\nLa Mesa ${numStr} no existe en el sistema.\n\nSolo administradores pueden crear mesas nuevas.`);
+    }
+    else {
+      const errorMsg = data?.message || error.message || 'Error desconocido';
+      alert(`❌ Error al procesar la mesa:\n${errorMsg}`);
+    }
+  } finally {
+    setCargandoPedido(false);
+  }
+};
 
-  // --- ACCIONES DE BOTONES DE TARJETA (Imprimir, Cobrar, Ver) ---
+// ... resto del código existente ...
+
+  // --- ACCIONES DE BOTONES DE TARJETA ---
   const handleImprimirCuenta = async (e, pedido) => {
       e.stopPropagation();
       setPedidoParaPreCuenta(pedido);
@@ -180,10 +299,7 @@ export default function GestionMesas({ onLogout, usuario }) {
   const handleOk = () => handleProcesarMesa(selectedMesaNum);
   const handleClicMesaGrid = (mesa) => handleProcesarMesa(mesa.numero);
   
-  // Botón "Inicio" solo funciona para ir al Dashboard
   const handleIrAlDashboard = () => navigate('/');
-  
-  // Botón "Salir" cierra sesión (Ideal para móviles)
   const handleSalirApp = () => { if(onLogout) onLogout(); navigate('/login'); };
 
   const BotonMenu = ({ icon, label, onClick, color = "text-gray-600", className }) => (
@@ -207,18 +323,18 @@ export default function GestionMesas({ onLogout, usuario }) {
   return (
     <div className="flex flex-col h-screen bg-slate-100 p-2 font-sans">
       
-      {/* HEADER ADAPTADO PARA MÓVIL */}
+      {/* HEADER */}
       <div className="flex justify-between gap-2 mb-2">
         <div className="flex gap-2 items-center">
             
-            {/* ✅ EN MÓVIL: Botón "Salir" para desloguearse (cambiar de mozo) */}
             <div className="md:hidden">
                  <BotonMenu icon={<LogOut/>} label="Salir" onClick={handleSalirApp} color="text-red-600" />
             </div>
 
-            {/* ✅ EN ESCRITORIO: Botón "Inicio" para ir al Dashboard (Solo Admin) */}
             <div className="hidden md:block">
-                 {esAdmin && <BotonMenu icon={<Home/>} label="Inicio" onClick={handleIrAlDashboard} color="text-blue-600" />}
+                 {(esAdmin || esCajero) && (
+                     <BotonMenu icon={<Home/>} label="Inicio" onClick={handleIrAlDashboard} color="text-blue-600" />
+                 )}
             </div>
 
             <BotonMenu icon={<Eraser/>} label="Limpiar" onClick={handleClear} />
@@ -265,16 +381,35 @@ export default function GestionMesas({ onLogout, usuario }) {
                         const esPagando = p.estado === 'pagando';
                         const colorFondo = getColorFondo(p.estado);
                         const colorBorde = getColorBorde(p.estado);
-                        const totalFmt = Math.round(parseFloat(p.total)).toLocaleString('es-CL');
+                        
+                        let totalNum = parseFloat(p.total);
+                        if (isNaN(totalNum) || (totalNum === 0 && (p.items?.length > 0 || p.combos?.length > 0))) {
+                             const sumaItems = p.items?.reduce((acc, it) => acc + (parseFloat(it.precio_unitario) * parseFloat(it.cantidad)), 0) || 0;
+                             const sumaCombos = p.combos?.reduce((acc, cb) => acc + (parseFloat(cb.precio_unitario) * parseFloat(cb.cantidad)), 0) || 0;
+                             totalNum = sumaItems + sumaCombos;
+                        }
+                        totalNum = totalNum || 0;
+                        const totalFmt = Math.round(totalNum).toLocaleString('es-CL');
                         const infoTiempo = getInfoTiempo(p.fecha_hora || p.horaPedido);
+
+                        // ✅ VERIFICAR SI LA MESA ES AJENA (solo para el grid visual, la validación real se hace al clickear)
+                        const idMozoPedido = p.id_mozo || p.mozo?.id;
+                        const esMesaAjena = esMozo && Number(idMozoPedido) !== Number(usuario.id);
 
                         return (
                         <div 
                             key={p.id}
                             onClick={() => handleClicMesaGrid(p.mesa)}
-                            className={`aspect-[4/5] rounded-lg border flex flex-col relative shadow-sm cursor-pointer hover:shadow-md transition-all overflow-hidden group ${infoTiempo.alerta ? 'ring-4 ring-red-400' : ''}`}
+                            className={`aspect-[4/5] rounded-lg border flex flex-col relative shadow-sm cursor-pointer hover:shadow-md transition-all overflow-hidden group ${infoTiempo.alerta ? 'ring-4 ring-red-400' : ''} ${esMesaAjena ? 'opacity-80' : ''}`}
                             style={{ backgroundColor: colorFondo, borderColor: colorBorde, borderWidth: '2px' }}
                         >
+                            {/* ✅ INDICADOR VISUAL DE BLOQUEO */}
+                            {esMesaAjena && (
+                                <div className="absolute top-1 right-1 z-10 text-red-500 bg-white/80 rounded-full p-0.5">
+                                    <Lock size={14} />
+                                </div>
+                            )}
+
                             <div className={`flex justify-between items-center p-1 ${infoTiempo.bg}`}>
                                 <span className={`text-[10px] font-bold flex items-center gap-0.5 ${infoTiempo.color}`}>
                                     <Clock size={10}/> {infoTiempo.texto}
@@ -294,7 +429,6 @@ export default function GestionMesas({ onLogout, usuario }) {
                                 <div className="text-xs font-black text-gray-800 bg-white/50 rounded py-0.5">${totalFmt}</div>
                             </div>
 
-                            {/* Botones de Acción: Visibles solo si no es móvil o si se expande */}
                             <div className="flex border-t border-gray-300 h-8">
                                 {esPagando ? (
                                     <>
@@ -312,7 +446,7 @@ export default function GestionMesas({ onLogout, usuario }) {
           )}
         </div>
 
-        {/* PANEL DERECHO: TECLADO (Adaptable) */}
+        {/* PANEL DERECHO: TECLADO */}
         <div className="flex flex-col bg-white rounded-xl shadow-sm p-3 border border-gray-200 min-w-[280px] w-full md:w-auto h-auto md:h-auto md:flex-1 overflow-y-auto flex-shrink-0">
             <div className="mb-2 relative">
                 <input type="text" value={selectedMesaNum} readOnly className="w-full h-14 text-4xl text-center border-2 rounded-xl font-mono font-bold bg-blue-50 text-blue-900 outline-none" placeholder="#" />
