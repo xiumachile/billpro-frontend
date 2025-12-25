@@ -6,21 +6,26 @@ const axiosInstance = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     },
-    withCredentials: false,
+    // CAMBIO 1: True para permitir cookies/sesiones de Laravel (Sanctum)
+    // Si usas tokens puros y te da error de CORS/CSRF, solo entonces vuélvelo a false.
+    withCredentials: true, 
 });
 
 // --- INTERCEPTOR REQUEST (Salida) ---
 axiosInstance.interceptors.request.use(
     (config) => {
         // 1. Buscar configuración manual (Prioridad para Escritorio/Tauri)
+        // Esto permite que si el usuario quiere conectar a otra IP local, pueda hacerlo.
         let host = localStorage.getItem('network_host');
 
-        // 2. Si no hay manual, usar variable de entorno (Prioridad para Web/PWA)
+        // 2. Si no hay manual, usar variable de entorno O EL DOMINIO FIJO
         if (!host) {
-            host = import.meta.env.VITE_API_URL;
+            // CAMBIO 2: Agregamos el "OR" (||) con tu dominio real.
+            // Esto garantiza que el .exe funcione aunque el .env falle al compilar.
+            host = import.meta.env.VITE_API_URL || 'https://clicktools.cl';
         }
 
-        // 3. Si sigue sin haber host, cancelamos
+        // 3. Si sigue sin haber host (Imposible ahora con el fix de arriba), cancelamos
         if (!host) {
             const controller = new AbortController();
             config.signal = controller.signal;
@@ -30,13 +35,11 @@ axiosInstance.interceptors.request.use(
         }
 
         // 4. Limpieza inteligente de la URL
-        let cleanHost = host.replace(/\/$/, ""); // Quitar slash final si existe
+        let cleanHost = host.replace(/\/$/, ""); 
 
-        // Si la URL ya termina en '/api' (común en VITE_API_URL), no lo agregamos de nuevo
         if (cleanHost.endsWith('/api')) {
             config.baseURL = cleanHost;
         } else {
-            // Si es solo la IP o dominio raíz, le pegamos el /api
             config.baseURL = `${cleanHost}/api`;
         }
 
@@ -55,18 +58,15 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Ignorar cancelaciones propias
         if (error.message === "NO_NETWORK_CONFIG") return Promise.reject(error);
 
-        // Error de red
         if (!error.response) {
-            console.warn("⚠️ Alerta: Error de conexión / Red inestable.");
+            // CAMBIO 3: Log más descriptivo para depurar en Tauri
+            console.warn(`⚠️ Error de Red hacia: ${error.config?.baseURL || 'Desconocido'}`);
             return Promise.reject(error);
         }
 
-        // Error 401 (Token vencido)
         if (error.response.status === 401) {
-            // Evitamos cerrar sesión si es solo una validación de PIN de admin
             if (!error.config.url.includes('/auth/validar-admin')) {
                 console.warn("🔒 Token expirado (401). Cerrando sesión...");
                 
