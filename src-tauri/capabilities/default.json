@@ -1,11 +1,27 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "main-capability",
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default",
-    "process:allow-exit" 
+    "core:window:default",
+    "core:window:allow-set-title",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:app:default",
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        {
+          "url": "https://clicktools.cl/**"
+        },
+        {
+          "url": "http://clicktools.cl/**"
+        }
+      ]
+    }
   ]
 }

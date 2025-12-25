@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "BILLPRO",
   "version": "0.1.0",
   "identifier": "com.billpro.app",
   "build": {
@@ -25,8 +25,9 @@
       }
     ],
     "security": {
-      "csp": null
-    }
+      "csp": "default-src 'self'; connect-src 'self' https://clicktools.cl https://*.clicktools.cl http://clicktools.cl; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data:; media-src 'self' https: http:;"
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
@@ -37,6 +38,20 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "plugins": {
+    "http": {
+      "scope": [
+        "https://clicktools.cl/**",
+        "http://clicktools.cl/**",
+        "https://*.clicktools.cl/**"
+      ]
+    }
   }
 }
