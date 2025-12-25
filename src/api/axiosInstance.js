@@ -1,49 +1,50 @@
 import axios from 'axios';
 
+// 1. Configuración Base
 const axiosInstance = axios.create({
-    timeout: 60000, 
+    timeout: 60000, // Esperar hasta 60 segundos antes de cancelar
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     },
-    // CAMBIO 1: True para permitir cookies/sesiones de Laravel (Sanctum)
-    // Si usas tokens puros y te da error de CORS/CSRF, solo entonces vuélvelo a false.
+    // IMPORTANTE: True para que Laravel Sanctum acepte la cookie de sesión/CSRF
     withCredentials: true, 
 });
 
 // --- INTERCEPTOR REQUEST (Salida) ---
 axiosInstance.interceptors.request.use(
     (config) => {
-        // 1. Buscar configuración manual (Prioridad para Escritorio/Tauri)
-        // Esto permite que si el usuario quiere conectar a otra IP local, pueda hacerlo.
+        // A. Prioridad 1: Configuración manual guardada en el PC (útil para pruebas locales)
         let host = localStorage.getItem('network_host');
 
-        // 2. Si no hay manual, usar variable de entorno O EL DOMINIO FIJO
+        // B. Prioridad 2: Variable de entorno (Web) o URL Fija (Escritorio/Respaldo)
+        // El "|| 'https://clicktools.cl'" es el SALVAVIDAS para que el .exe funcione 
+        // aunque el .env falle en GitHub Actions.
         if (!host) {
-            // CAMBIO 2: Agregamos el "OR" (||) con tu dominio real.
-            // Esto garantiza que el .exe funcione aunque el .env falle al compilar.
             host = import.meta.env.VITE_API_URL || 'https://clicktools.cl';
         }
 
-        // 3. Si sigue sin haber host (Imposible ahora con el fix de arriba), cancelamos
+        // C. Validación final (Esto nunca debería pasar gracias al salvavidas)
         if (!host) {
             const controller = new AbortController();
             config.signal = controller.signal;
             controller.abort("NO_NETWORK_CONFIG");
-            console.error("⛔ Petición bloqueada: No hay IP ni URL de API configurada.");
+            if (window.__TAURI__) alert("Error Crítico: No hay URL de API configurada.");
             return config;
         }
 
-        // 4. Limpieza inteligente de la URL
+        // D. Limpieza y Formato de URL
+        // Quitamos la barra final si existe para evitar dobles barras (//)
         let cleanHost = host.replace(/\/$/, ""); 
 
+        // Aseguramos que termine en /api
         if (cleanHost.endsWith('/api')) {
             config.baseURL = cleanHost;
         } else {
             config.baseURL = `${cleanHost}/api`;
         }
 
-        // 5. Inyectar Token
+        // E. Inyectar Token (si existe)
         const token = localStorage.getItem('token');
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
@@ -58,18 +59,25 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Ignorar cancelaciones manuales
         if (error.message === "NO_NETWORK_CONFIG") return Promise.reject(error);
 
-        if (!error.response) {
-            // CAMBIO 3: Log más descriptivo para depurar en Tauri
-            console.warn(`⚠️ Error de Red hacia: ${error.config?.baseURL || 'Desconocido'}`);
-            return Promise.reject(error);
+        // --- DIAGNÓSTICO PARA TAURI (Escritorio) ---
+        // Si hay un error de red y estamos en la App de Escritorio, mostramos alerta.
+        // Esto te ayudará a ver por qué falla el .exe (CORS, 404, Network Error)
+        if (!error.response && window.__TAURI__) {
+             const urlIntentada = error.config?.baseURL || 'Desconocida';
+             alert(`⚠️ ERROR DE CONEXIÓN:\n\nNo se pudo conectar con el servidor.\nIntentando conectar a:\n${urlIntentada}\n\nPosibles causas:\n1. El servidor está apagado.\n2. Problema de CORS.\n3. Tu internet no funciona.`);
         }
+        // -------------------------------------------
 
-        if (error.response.status === 401) {
+        // Error 401 (No autorizado / Token vencido)
+        if (error.response && error.response.status === 401) {
+            // No cerrar sesión si es solo una validación de PIN administrativa
             if (!error.config.url.includes('/auth/validar-admin')) {
-                console.warn("🔒 Token expirado (401). Cerrando sesión...");
+                console.warn("🔒 Sesión expirada. Redirigiendo al login...");
                 
+                // Evitar bucle infinito si ya estamos en login
                 if (window.location.pathname !== '/login') {
                     localStorage.removeItem('token');
                     localStorage.removeItem('usuarioInfo');
