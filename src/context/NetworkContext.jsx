@@ -82,22 +82,29 @@ export const NetworkProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
+useEffect(() => {
     const init = async () => {
       let hostToTest = localStorage.getItem('network_host');
+      
+      // URL CORRECTA QUE QUEREMOS FORZAR
+      const CORRECT_URL = import.meta.env.VITE_API_URL || "https://clicktools.cl/api";
+      const OLD_BAD_URL = "api.clicktools.cl";
+
       let isAutoConfig = false;
 
-      // 1. Si no hay config local, buscamos la variable de entorno (PWA en VPS)
-      if (!hostToTest && import.meta.env.VITE_API_URL) {
-          console.log("🌍 Entorno Web detectado. Auto-configurando:", import.meta.env.VITE_API_URL);
-          hostToTest = import.meta.env.VITE_API_URL;
+      // CORRECCIÓN: Si no hay host guardado O si el guardado es el malo, usamos el correcto.
+      if (!hostToTest || hostToTest.includes(OLD_BAD_URL)) {
+          console.log("🌍 Configuración automática o corrección aplicada:", CORRECT_URL);
+          hostToTest = CORRECT_URL;
           isAutoConfig = true;
+          // Forzamos la limpieza inmediata del valor malo
+          localStorage.removeItem('network_host'); 
       }
 
       if (hostToTest) {
         const success = await checkConnection(hostToTest);
         if (success) {
-          // Si fue autoconfiguración exitosa, guardamos para persistencia
+          // Si conectó, guardamos la URL buena para siempre
           if (isAutoConfig) {
               localStorage.setItem('network_host', hostToTest);
           }
@@ -105,12 +112,10 @@ export const NetworkProvider = ({ children }) => {
           setIsConnected(true);
           setShowModal(false);
         } else {
-          // Si falla (aunque sea autoconfig), mostramos modal para corregir
           console.warn("⚠️ La URL configurada no responde.");
           setShowModal(true);
         }
       } else {
-        // No hay config ni variable de entorno -> Es Escritorio primera vez
         setShowModal(true);
       }
       
