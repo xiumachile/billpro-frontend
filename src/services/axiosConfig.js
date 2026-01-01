@@ -21,7 +21,7 @@ axiosInstance.interceptors.request.use(
         // El "|| 'https://clicktools.cl'" es el SALVAVIDAS para que el .exe funcione 
         // aunque el .env falle en GitHub Actions.
         if (!host) {
-            host = import.meta.env.VITE_API_URL || 'https://clicktools.cl';
+            host = import.meta.env.VITE_API_URL || 'https://192.168.4.126:8000';
         }
         
         // C. Validación final (Esto nunca debería pasar gracias al salvavidas)

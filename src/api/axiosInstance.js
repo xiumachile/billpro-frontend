@@ -2,13 +2,13 @@ import axios from 'axios';
 
 // 1. Configuración Base
 const axiosInstance = axios.create({
-    timeout: 60000, // Esperar hasta 60 segundos antes de cancelar
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    },
-    // IMPORTANTE: True para que Laravel Sanctum acepte la cookie de sesión/CSRF
-    withCredentials: true, 
+  // Si no hay variable de entorno, usa localhost por defecto
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
 });
 
 // --- INTERCEPTOR REQUEST (Salida) ---
@@ -18,13 +18,11 @@ axiosInstance.interceptors.request.use(
         let host = localStorage.getItem('network_host');
 
         // B. Prioridad 2: Variable de entorno (Web) o URL Fija (Escritorio/Respaldo)
-        // El "|| 'https://clicktools.cl'" es el SALVAVIDAS para que el .exe funcione 
-        // aunque el .env falle en GitHub Actions.
         if (!host) {
             host = import.meta.env.VITE_API_URL || 'https://clicktools.cl';
         }
 
-        // C. Validación final (Esto nunca debería pasar gracias al salvavidas)
+        // C. Validación final
         if (!host) {
             const controller = new AbortController();
             config.signal = controller.signal;
@@ -34,15 +32,25 @@ axiosInstance.interceptors.request.use(
         }
 
         // D. Limpieza y Formato de URL
-        // Quitamos la barra final si existe para evitar dobles barras (//)
         let cleanHost = host.replace(/\/$/, ""); 
 
-        // Aseguramos que termine en /api
         if (cleanHost.endsWith('/api')) {
             config.baseURL = cleanHost;
         } else {
             config.baseURL = `${cleanHost}/api`;
         }
+
+        // ============================================================
+        // ✅ NUEVO: INYECCIÓN DE TENANT (RESTAURANTE)
+        // ============================================================
+        // Leemos el ID seleccionado en el TenantSelector
+        const tenantId = localStorage.getItem('tenant_id');
+        
+        if (tenantId) {
+            // Enviamos la cabecera para que Laravel sepa qué BD usar
+            config.headers['X-Tenant'] = tenantId; 
+        }
+        // ============================================================
 
         // E. Inyectar Token (si existe)
         const token = localStorage.getItem('token');
@@ -59,31 +67,36 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Ignorar cancelaciones manuales
         if (error.message === "NO_NETWORK_CONFIG") return Promise.reject(error);
 
         // --- DIAGNÓSTICO PARA TAURI (Escritorio) ---
-        // Si hay un error de red y estamos en la App de Escritorio, mostramos alerta.
-        // Esto te ayudará a ver por qué falla el .exe (CORS, 404, Network Error)
         if (!error.response && window.__TAURI__) {
              const urlIntentada = error.config?.baseURL || 'Desconocida';
-             alert(`⚠️ ERROR DE CONEXIÓN:\n\nNo se pudo conectar con el servidor.\nIntentando conectar a:\n${urlIntentada}\n\nPosibles causas:\n1. El servidor está apagado.\n2. Problema de CORS.\n3. Tu internet no funciona.`);
+             // Solo alertar si no es una cancelación intencional
+             if (error.code !== "ERR_CANCELED") {
+                 console.error(`⚠️ Error de conexión a: ${urlIntentada}`);
+             }
         }
-        // -------------------------------------------
 
         // Error 401 (No autorizado / Token vencido)
         if (error.response && error.response.status === 401) {
-            // No cerrar sesión si es solo una validación de PIN administrativa
             if (!error.config.url.includes('/auth/validar-admin')) {
                 console.warn("🔒 Sesión expirada. Redirigiendo al login...");
                 
-                // Evitar bucle infinito si ya estamos en login
                 if (window.location.pathname !== '/login') {
                     localStorage.removeItem('token');
                     localStorage.removeItem('usuarioInfo');
+                    // Opcional: No borramos tenant_id para que no tenga que escribir el restaurante de nuevo
                     window.location.href = '/login';
                 }
             }
+        }
+
+        // Error 404 en identificación de Tenant (Si borraron el restaurante)
+        if (error.response && error.response.status === 404 && error.response.data?.message?.includes('Tenant')) {
+            alert("El restaurante seleccionado no existe o no está disponible.");
+            localStorage.removeItem('tenant_id');
+            window.location.href = '/';
         }
 
         return Promise.reject(error);

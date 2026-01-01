@@ -5,11 +5,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'r
 import { CajaProvider } from './context/CajaContext';
 import { LanguageProvider } from './context/LanguageContext';
 
+// --- COMPONENTES AUXILIARES ---
+import SessionManager from './components/SessionManager';
+import TenantSelector from './components/TenantSelector'; // ✅ NUEVO: Selector de Restaurante
+
 // --- COMPONENTES PRINCIPALES ---
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 import GestionMesas from './components/GestionMesas';
-// ❌ ELIMINADO: import Pedido from './components/Pedido'; (Ya no se usa)
 import Clientes from './components/Clientes';
 import FormularioCliente from './components/FormularioCliente';
 import CartaManager from './components/CartaManager';
@@ -47,10 +50,14 @@ import ConfiguracionRed from './components/Parametros/ConfiguracionRed';
 import ConfiguracionComandas from './components/Parametros/ConfiguracionComandas';
 import ConfiguracionCajas from './components/Parametros/ConfiguracionCajas';
 import ConfiguracionApps from './components/Parametros/ConfiguracionApps';
+import LicenseScreen from './screens/config/LicenseScreen';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
   const [usuario, setUsuario] = useState(null);
+  
+  // ✅ ESTADO NUEVO: Controlar si ya se seleccionó un restaurante (Tenant)
+  const [hasTenant, setHasTenant] = useState(!!localStorage.getItem('tenant_id'));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -73,10 +80,20 @@ function App() {
   };
 
   const handleLogout = () => {
+    // Al salir, solo borramos sesión de usuario, NO el tenant.
+    // El usuario sigue en el mismo restaurante pero en la pantalla de login.
     localStorage.removeItem('token');
     localStorage.removeItem('usuarioInfo');
     setUsuario(null);
     setIsLoggedIn(false);
+  };
+
+  // ✅ Función para cuando el usuario selecciona el restaurante exitosamente
+  const handleTenantSelected = () => {
+    setHasTenant(true);
+    // Recargar la página es una buena práctica aquí para asegurar que 
+    // axiosInstance tome el header limpio desde el inicio.
+    window.location.reload();
   };
 
   // --- LÓGICA DE REDIRECCIÓN INTELIGENTE ---
@@ -111,10 +128,19 @@ function App() {
   const TakeOutWrapper = () => { const navigate = useNavigate(); return <ProtectedRoute><TakeOutManager usuario={usuario} onVolver={() => navigate('/')} /></ProtectedRoute>; };
   const MesaWrapper = () => { const navigate = useNavigate(); return <ProtectedRoute><MesaManager usuario={usuario} onVolver={() => navigate('/')} /></ProtectedRoute>; };
 
+  // 🔒 BLOQUEO DE SEGURIDAD SAAS
+  // Si no hay restaurante seleccionado, mostramos el selector y NO cargamos el resto de la app
+  if (!hasTenant) {
+    return <TenantSelector onTenantSelected={handleTenantSelected} />;
+  }
+
   return (
     <Router>
       <LanguageProvider>
         <CajaProvider usuario={usuario}>
+          
+          <SessionManager />
+
           <div className="App">
             <Routes>
               {/* === PÚBLICAS === */}
@@ -128,9 +154,6 @@ function App() {
               <Route path="/delivery" element={<DeliveryWrapper />} />
               <Route path="/para-llevar" element={<TakeOutWrapper />} />
               <Route path="/mesas" element={<MesaWrapper />} />
-
-              {/* ❌ RUTAS DE 'PEDIDO' ELIMINADAS PORQUE YA USAMOS MODALES */}
-              {/* <Route path="/pedido/nuevo" ... /> */}
               
               {/* Reimprimir */}
               <Route path="/reimprimir" element={<ProtectedRoute><ReimprimirManager /></ProtectedRoute>} />
@@ -172,6 +195,9 @@ function App() {
               <Route path="/parametros/impresoras" element={<ProtectedRoute><PermissionRoute requiredPermission="view-impresoras"><ConfiguracionImpresoras usuario={usuario} /></PermissionRoute></ProtectedRoute>} />
               <Route path="/parametros/red" element={<ProtectedRoute><PermissionRoute requiredPermission="manage-red"><ConfiguracionRed usuario={usuario} /></PermissionRoute></ProtectedRoute>} />
               <Route path="/parametros/comandas" element={<ProtectedRoute><PermissionRoute requiredPermission="manage-comandas"><ConfiguracionComandas usuario={usuario} /></PermissionRoute></ProtectedRoute>} />
+
+              {/* ✅ RUTA DE LICENCIA */}
+              <Route path="/configuracion/licencia" element={<ProtectedRoute><PermissionRoute requiredPermission="manage-users"><LicenseScreen /></PermissionRoute></ProtectedRoute>} />
 
               {/* === DEFAULT === */}
               <Route path="*" element={<Navigate to={isLoggedIn ? "/" : "/login"} replace />} />

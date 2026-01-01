@@ -1,67 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axiosInstance';
-import { Lock, Loader2, Delete, LogIn, Power, MonitorX } from 'lucide-react'; // ✅ Agregué MonitorX
+import { Lock, Loader2, Delete, LogIn, Power, MonitorX } from 'lucide-react'; 
 import { useLanguage } from '../context/LanguageContext';
-import { getTerminalId, getDeviceType } from '../utils/terminalId'; // ✅ Usamos las utilidades
 
-// ✅ Importar la función para cerrar la app en Tauri
+// Importar función para cerrar app en Tauri
 import { exit } from '@tauri-apps/plugin-process';
 
 export default function LoginScreen({ onLoginSuccess }) {
   const navigate = useNavigate();
   const { t } = useLanguage(); 
   
-  // --- ESTADOS PARA LOGIN CON PIN ---
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [accessDenied, setAccessDenied] = useState(false);
 
-  // --- ESTADOS PARA VERIFICACIÓN DE TERMINAL ---
-  const [terminalStatus, setTerminalStatus] = useState('checking'); // checking | authorized | blocked
-  const [blockMessage, setBlockMessage] = useState('');
-
-  // 1️⃣ EFECTO: VERIFICAR TERMINAL AL CARGAR
   useEffect(() => {
-    const verifyTerminal = async () => {
-      try {
-        const uuid = getTerminalId();
-        // Detectar tipo (Si es Tauri forzamos 'desktop', sino lo que diga el navegador)
-        const typeRaw = getDeviceType(); 
-        const type = window.__TAURI_INTERNALS__ ? 'desktop' : typeRaw; 
-        
-        // Llamada al backend para registrar/validar
-        await axios.post('/terminal/register', { 
-            uuid, 
-            type,
-            name: type === 'desktop' ? 'Caja Desktop' : 'Dispositivo Móvil' 
-        });
-        
-        setTerminalStatus('authorized');
+    const checkEnvironment = () => {
+      // 1. Detectar si es Tauri (App de Escritorio)
+      const isTauri = window.__TAURI__ || window.__TAURI_INTERNALS__ || window.navigator.userAgent.includes('Tauri');
 
-      } catch (err) {
-        console.error("Error verificando terminal:", err);
+      if (isTauri) return; 
 
-        if (err.response?.status === 403) {
-            // ⛔ BLOQUEO: El plan no permite más terminales
-            setTerminalStatus('blocked');
-            setBlockMessage(err.response.data.message || 'Límite de terminales alcanzado.');
-        } else {
-            // ⚠️ ERROR DE RED / OFFLINE:
-            // Por seguridad operativa, si no hay internet, solemos dejar pasar 
-            // asumiendo que ya fue validada antes.
-            // Si prefieres seguridad estricta, cambia esto a 'blocked'.
-            setTerminalStatus('authorized'); 
-        }
+      // 2. Si NO es Tauri, verificar si es móvil/tablet
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      const isMobile = /android|ipad|iphone|ipod|windows phone/i.test(userAgent);
+      const isIpad = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+      // 3. Si es PC Web (No móvil y no Tauri) -> Bloquear
+      if (!isMobile && !isIpad) {
+        setAccessDenied(true);
       }
     };
 
-    verifyTerminal();
+    checkEnvironment();
   }, []);
 
-  // 2️⃣ EFECTO: MANEJO DE TECLADO FÍSICO (Solo si está autorizado)
   useEffect(() => {
-    if (terminalStatus !== 'authorized') return; // No escuchar si está bloqueado
+    if (accessDenied) return; 
 
     const handleKeyDown = (e) => {
       if (loading) return;
@@ -71,7 +48,7 @@ export default function LoginScreen({ onLoginSuccess }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [code, loading, terminalStatus]);
+  }, [code, loading, accessDenied]);
 
   const handleDigit = (digit) => {
     if (code.length < 4) {
@@ -143,9 +120,9 @@ export default function LoginScreen({ onLoginSuccess }) {
   };
 
   // -----------------------------------------------------
-  // ⛔ RENDERIZADO: PANTALLA BLOQUEADA (PLAN EXCEDIDO)
+  // RENDERIZADO PANTALLA BLOQUEADA (PC WEB)
   // -----------------------------------------------------
-  if (terminalStatus === 'blocked') {
+  if (accessDenied) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 font-sans text-center">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 border border-slate-700">
@@ -153,44 +130,32 @@ export default function LoginScreen({ onLoginSuccess }) {
               <MonitorX size={40} />
            </div>
            
-           <h2 className="text-2xl font-black text-slate-800 mb-4">Terminal No Autorizada</h2>
+           <h2 className="text-2xl font-black text-slate-800 mb-4">Acceso Restringido</h2>
            
            <p className="text-slate-600 mb-6 leading-relaxed">
-             {blockMessage}
+             La versión web de <strong>BillPro</strong> está optimizada exclusivamente para Tablets y Celulares.
            </p>
            
-           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
-             <p className="text-xs text-gray-400 uppercase font-bold mb-1">ID de Dispositivo</p>
-             <p className="font-mono text-sm text-gray-700 select-all">{getTerminalId()}</p>
+           <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-6">
+             <p className="text-slate-500 text-sm mb-2">
+               Para usar el sistema en esta computadora, es necesario utilizar la <strong>Aplicación de Escritorio</strong>.
+             </p>
            </div>
 
+           {/* MENSAJE SOLICITADO */}
            <div className="border-t border-slate-100 pt-6">
               <p className="text-sm font-bold text-slate-400 uppercase tracking-wide">
-                Contacte a su administrador para activar este equipo
+                Favor contacte a su proveedor de esta app
               </p>
-              <button onClick={handleExit} className="mt-4 text-red-500 text-sm font-bold hover:underline">
-                Cerrar Aplicación
-              </button>
            </div>
+
         </div>
       </div>
     );
   }
 
   // -----------------------------------------------------
-  // ⏳ RENDERIZADO: CARGANDO / VERIFICANDO
-  // -----------------------------------------------------
-  if (terminalStatus === 'checking') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
-        <p className="font-bold tracking-widest text-sm uppercase">Verificando Terminal...</p>
-      </div>
-    );
-  }
-
-  // -----------------------------------------------------
-  // ✅ RENDERIZADO: LOGIN NORMAL (PIN)
+  // RENDERIZADO LOGIN NORMAL
   // -----------------------------------------------------
   const baseBtn = "h-20 w-full text-3xl font-bold rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center";
   const numBtn = `${baseBtn} bg-white text-slate-700 border-b-4 border-slate-200 hover:bg-blue-50 active:border-b-0 active:translate-y-1`;

@@ -12,7 +12,13 @@ import FormasPagoManager from './FormasPagoManager';
 import UnidadesMedidaManager from './UnidadesMedidaManager';
 import ConfiguracionVarios from './ConfiguracionVarios';
 import ConfiguracionApps from './ConfiguracionApps'; 
-import ConfiguracionPrecios from './ConfiguracionPrecios'; // ✅ Importar el nuevo componente
+import ConfiguracionPrecios from './ConfiguracionPrecios'; 
+import ConfiguracionTerminales from './ConfiguracionTerminales'; // Asegúrate de mover el archivo a la misma carpeta o ajustar ruta
+import { Laptop } from 'lucide-react'; // O Monitor
+
+// ✅ 1. IMPORTAR LA PANTALLA DE LICENCIA
+// (Ajusta los '../' según tu estructura real de carpetas)
+import LicenseScreen from '../../screens/config/LicenseScreen';
 
 import {
   ArrowLeft,
@@ -28,13 +34,15 @@ import {
   Monitor,
   Settings,
   Smartphone,
-  DollarSign // ✅ Nuevo icono para precios
+  DollarSign,
+  ShieldCheck // ✅ 2. IMPORTAR EL ICONO NUEVO
 } from 'lucide-react';
 
 export default function Parametros({ usuario }) {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [activeTab, setActiveTab] = useState('impresoras'); 
+  // Puedes cambiar el tab inicial a 'licencia' si quieres que sea lo primero que vean
+  const [activeTab, setActiveTab] = useState('licencia'); 
   const [nombreCarta, setNombreCarta] = useState('CARTA NO ACTIVA');
   const [numeroTerminal, setNumeroTerminal] = useState('POS-01');
 
@@ -71,7 +79,7 @@ export default function Parametros({ usuario }) {
   useEffect(() => {
     const cargarCartaActiva = async () => {
       try {
-        setNombreCarta('CARTA ACTIVA'); // (Aquí podrías llamar a una API real)
+        setNombreCarta('CARTA ACTIVA'); 
       } catch (error) {
         console.error('Error al cargar carta activa:', error);
         setNombreCarta('CARTA NO ACTIVA');
@@ -82,6 +90,14 @@ export default function Parametros({ usuario }) {
 
   // Configuración de tabs
   const tabs = [
+    // ✅ 3. AGREGAR LA NUEVA PESTAÑA DE LICENCIA
+    { 
+      id: 'licencia', 
+      name: 'Mi Plan / Licencia', 
+      icon: ShieldCheck, 
+      component: LicenseScreen,
+      description: 'Estado de suscripción y límites de usuarios'
+    },
     { 
       id: 'cajas', 
       name: 'Cajas Físicas', 
@@ -90,7 +106,7 @@ export default function Parametros({ usuario }) {
       description: 'Gestiona los terminales y puntos de venta'
     },
     { 
-      id: 'precios', // ✅ NUEVA PESTAÑA
+      id: 'precios', 
       name: 'Listas de Precios', 
       icon: DollarSign, 
       component: ConfiguracionPrecios,
@@ -152,6 +168,15 @@ export default function Parametros({ usuario }) {
       component: ConfiguracionVarios,
       description: 'Idioma, Bloqueo y Modo Buffet'
     },
+
+    { 
+  id: 'terminales', 
+  name: 'Gestión de Terminales', 
+  icon: Laptop, 
+  component: ConfiguracionTerminales,
+  description: 'Administra los dispositivos conectados y libera cupos'
+},    
+    
   ];
 
   const activeTabData = tabs.find(tab => tab.id === activeTab);
